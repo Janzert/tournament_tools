@@ -58,13 +58,11 @@ def parse_history(history_file, active):
 def rate(seeds, scores, pair_counts, virtual_weight):
     scores = Counter(scores)
     scores.update({p: 0.5 * virtual_weight for p in seeds.keys()})
-    max_rating = 0
-    min_rating = float('inf')
-    for seed in seeds.values():
-        max_rating = max(seed, max_rating)
-        min_rating = min(seed, min_rating)
+    max_rating = max(seeds.values())
+    min_rating = min(seeds.values())
     mid_rating = (min_rating + max_rating) / 2.0
     CF = math.log(10) / 400.0
+    # convert from elo to ratio
     seeds = {p: math.exp((s - mid_rating) * CF) for p, s in seeds.items()}
     old_rating = dict(seeds)
     old_error = float('inf')
@@ -95,8 +93,12 @@ def rate(seeds, scores, pair_counts, virtual_weight):
             old_rating = dict(new_rating)
         else:
             break
-    ratings = {p: round((math.log(r) / CF) + mid_rating, 10)
-            for p, r in new_rating.items()}
+    # round to 12 significant decimal places
+    ratings = {p: round(r, 11-int(math.floor(math.log10(r))))
+            for p, r in old_rating.items()}
+    # convert back to elo range
+    ratings = {p: (math.log(r) / CF) + mid_rating
+            for p, r in ratings.items()}
     return ratings
 
 def add_stats(tourn):
