@@ -1,7 +1,7 @@
 
 import math
 import sys
-from collections import Counter
+from collections import Counter, defaultdict
 
 from mwmatching import maxWeightMatching
 
@@ -58,6 +58,9 @@ def parse_history(history_file, active):
 def rate(seeds, scores, pair_counts, virtual_weight):
     scores = Counter(scores)
     scores.update({p: 0.5 * virtual_weight for p in seeds.keys()})
+    tuple_counts = defaultdict(int)
+    tuple_counts.update({tuple(p): c for p, c in pair_counts.items()})
+    tuple_counts.update({tuple(reversed(p)): c for p, c in tuple_counts.items()})
     max_rating = max(seeds.values())
     min_rating = min(seeds.values())
     mid_rating = (min_rating + max_rating) / 2.0
@@ -77,7 +80,9 @@ def rate(seeds, scores, pair_counts, virtual_weight):
             derivative = [virtual_weight * seed * inverse_sum ** 2]
 
             for opponent in seeds.keys():
-                weight = pair_counts[frozenset((player, opponent))]
+                if player == opponent:
+                    continue
+                weight = tuple_counts[(player, opponent)]
                 if weight != 0:
                     op_rating = old_rating[opponent]
                     inverse_sum = 1 / (rating + op_rating)
