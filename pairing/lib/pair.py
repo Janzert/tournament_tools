@@ -125,55 +125,17 @@ def add_stats(tourn):
         tourn.pair_counts[pset] += 1
     return tourn
 
-def pair_fte(tourn, lives):
+def weighted_pairing(tourn, scale):
     players = tourn.live_players
-    wins = tourn.wins
-    losses = tourn.losses
-    played = tourn.played
-    ranks = tourn.ranks
-
-    num_alive = len(tourn.live_players)
-    if len(tourn.games):
-        pair_mul = (num_alive + 1) ** tourn.pair_counts.most_common(1)[0][1]
-        most_games = played.most_common(1)[0][1]
-    else:
-        pair_mul = 1
-        most_games = 0
-
-    ###
-    # If an odd number of players remain, one bye will be given, otherwise none.
-    # Give the bye only to a player among the players with the fewest byes so far.
-    # In descending order of N, minimize the number of pairings occurring for the Nth time.
-    # Give the bye to a player with as few losses as possible.
-    # In descending order of N, minimize the number of pairings between players whose number of losses differ by N.
-    # Give the bye to the player with the best possible rank.
-    # Maximize the sum of the squares of the rank differences between paired players.
-    ###
-
-    def bye_weight(player):
-        weight = most_games - played[player]
-        weight *= pair_mul * lives
-        weight += losses[player]
-        weight *= lives * (num_alive + 1) * ((num_alive + 1) ** lives)
-        weight += ranks[player]
-        weight *= num_alive ** 2
-        return weight
-
-    def pair_weight(p1, p2):
-        weight = (num_alive + 1) ** tourn.pair_counts[frozenset((p1, p2))]
-        weight *= lives ** 2 * ((num_alive + 1) ** lives)
-        weight += (num_alive + 1) ** abs(losses[p1] - losses[p2])
-        weight *= (num_alive + 1) * (num_alive ** 2)
-        weight += num_alive ** 2 - (ranks[p1] - ranks[p2]) ** 2
-        return weight
+    num_alive = len(players)
 
     weights = []
     for p1_ix, p1 in enumerate(players):
         for p2_ix, p2 in enumerate(players[p1_ix + 1:], p1_ix + 1):
-            wt = pair_weight(p1, p2)
+            wt = scale.pair(p1, p2)
             weights.append((p1_ix, p2_ix, 0 - wt))
         if num_alive % 2 == 1:
-            wt = bye_weight(p1)
+            wt = scale.bye(p1)
             weights.append((p1_ix, num_alive, 0 - wt))
     opponents = maxWeightMatching(weights, maxcardinality=True)
     weight_dict = {(v1, v2): wt for v1, v2, wt in weights}
