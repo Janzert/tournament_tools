@@ -4,6 +4,7 @@
 # 65001 split 10 ways causes naive to distribute 64999
 # 100000 split 15 ways causes naive to distribute 100001
 # WC2013 fund was 52357 split 14 ways
+# WC2014 fund was 259011 split 15 ways
 
 import argparse
 import heapq
