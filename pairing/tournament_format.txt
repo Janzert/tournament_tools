@@ -1,0 +1,31 @@
+This tournament state file format is modelled after the format used by Omar's
+tournament simulator. It's expanded to cover more possible events in a
+tournament.
+
+Lines beginning with # or * are comments and the rest of the file is ignored.
+
+Player's are added to a tournement with a player line:
+    player <name> <seed rating>
+Where name is a string with no spaces and seed rating is a decimal number.
+There should be one player line per player that participates in the
+tournament.
+
+Player's can be removed from pairing consideration with a remove line:
+    remove <name>
+
+Player's can be re-added for consideration with an add line:
+    add <name>
+
+Game results are given with:
+    game <player 1> <player 2> <result>
+The words pair or pick can also be used in place of game.
+player 1 and player 2 are the are the players in the game with player 1
+making the first move.
+result will be one of:
+    winner <winner name>
+    draw
+    double win
+    double loss
+    no decision
+    vacated
+

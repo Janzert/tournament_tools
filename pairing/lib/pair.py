@@ -6,6 +6,7 @@ from collections import Counter, defaultdict
 from mwmatching import maxWeightMatching
 
 def parse_seeds(seed_file):
+    """ Parse aaaa style seed file """
     players = []
     seeds = dict()
     for line_num, line in enumerate(seed_file.readlines(), start=1):
@@ -23,37 +24,126 @@ def parse_seeds(seed_file):
     return tuple(players), seeds
 
 def parse_history(history_file, active):
+    """ Parse aaaa style game history file """
     games = list()
-    players = active.keys()
     for line_num, line in enumerate(history_file.readlines(), start=1):
         line = line.strip()
         if len(line) == 0 or line.startswith("#"):
             continue
         words = line.split()
         p1 = words[0]
-        if p1 not in players:
+        if p1 not in active:
             raise ValueError(
                     "Unrecognized player 1 (%s) in history at line %d",
                     p1, line_num)
         if len(words) == 1:
-            active[p1] = False if active[p1] else True
+            if p1 in active:
+                active.remove(p1)
+            else:
+                active.add(p1)
             continue
         p2 = words[1]
-        if p2 not in players:
+        if p2 not in active:
             raise ValueError(
                     "Unrecognized player 2 (%s) in history at line %d",
                     p2, line_num)
         if len(words) == 2:
             # double forfeit
-            games.append((p1, p2, None))
+            games.append((p1, p2, ("double loss",)))
             continue
         winner = words[2]
         if winner not in (p1, p2):
             raise ValueError(
                     "Winner (%s) not a player of game in history at line %d",
                     winner, line_num)
-        games.append((p1, p2, winner))
+        games.append((p1, p2, ("winner", winner)))
     return games
+
+def parse_tournament(tourn_state):
+    players = set()
+    seeds = dict()
+    games = list()
+    def parse_player(line):
+        raise ValueError("error at {}".format(line_num))
+        tokens = line.split()
+        if len(tokens) != 2:
+            raise ValueError("Bad player entry at line %d" % (line_num,))
+        name, seed = toks
+        seed = float(seed)
+        if name in seeds:
+            raise ValueError(
+                    "Duplicate player entry found for %s at line %d" % (
+                        name, line_num))
+        seeds[name] = seed
+        players.add(name)
+    def parse_remove(line_num, line):
+        if line not in seeds:
+            raise ValueError("Tried to remove unknown player %s at line %d" % (
+                line, line_num))
+        if line not in players:
+            raise ValueError(
+                    "Tried to remove already removed player %s at line %d" % (
+                        line, line_num))
+        players.remove(line)
+    def parse_add(line_num, line):
+        if line not in seeds:
+            raise ValueError("Tried to re-add unknown player %s at line %d" % (
+                line, line_num))
+        players.add(line)
+    def parse_game(line_num, line):
+        tokens = line.split(None, 2)
+        if len(tokens) != 3:
+            raise ValueError("Bad game entry at line %d" % (line_num,))
+        p1, p2, result = tokens
+        if p1 not in seeds:
+            ValueError("Unknown player 1 '%s' in game at line %d" % (
+                p1, line_num))
+        if p2 not in seeds:
+            ValueError("Unknown player 2 '%s' in game at line %d" % (
+                p2, line_num))
+        if result.startswith("winner"):
+            tokens = result.split(None, 1)
+            if len(tokens) != 2:
+                ValueError("Bad game result at line %d" % (line_num,))
+            winner = tokens[1]
+            if winner not in (p1, p2):
+                raise ValueError(
+                        "Recorded winner %s not a player in game at line %d" % (
+                            winner, line_num))
+            games.append((p1, p2, ("win", winner)))
+        elif result in ("draw", "double win", "double loss", "no decision",
+                "vacated"):
+            games.append((p1, p2, (result,)))
+        else:
+            raise ValueError("Unrecognized result %s for game at line %d" % (
+                result, line_num))
+    type_handlers = {
+            "player": parse_player,
+            "remove": parse_remove,
+            "add": parse_add,
+            "game": parse_game,
+            "pair": parse_game,
+            "pick": parse_game,
+            }
+    for line_num, line in enumerate(tourn_state, start=1):
+        line = line.strip()
+        if len(line) == 0 or line[0] == "#" or line[0] == "*":
+            continue
+        tokens = line.split(None, 1)
+        if len(tokens) > 1:
+            ltype, lrest = tokens
+        elif toks[0] == "stop":
+            break
+        else:
+            raise ValueError("Unrecognized entry at line %d" % (line_num,))
+        try:
+            type_handlers[ltype](line_num, lrest)
+        except KeyError:
+            raise ValueError("Unrecognized line type %s at line %d" % (
+                ltype, line_num))
+    players = tuple(players)
+    games = tuple(games)
+    return players, seeds, games
 
 def rate(seeds, scores, pair_counts, virtual_weight):
     scores = Counter(scores)
@@ -109,20 +199,32 @@ def rate(seeds, scores, pair_counts, virtual_weight):
 def add_stats(tourn):
     tourn.played = Counter()
     tourn.wins = Counter()
+    tourn.draws = Counter()
     tourn.losses = Counter()
     tourn.pair_counts = Counter()
     for g in tourn.games:
-        tourn.played[g[0]] += 1
-        tourn.played[g[1]] += 1
-        if g[2] != g[0]:
+        if g[2][0] == "winner":
+            if g[2][1] != g[0]:
+                tourn.losses[g[0]] += 1
+            if g[2][1] != g[1]:
+                tourn.losses[g[1]] += 1
+            tourn.wins[g[2][1]] += 1
+        elif g[2][0] == "draw":
+            tourn.draws[g[0]] += 1
+            tourn.draws[g[1]] += 1
+        elif g[2][0] == "double win":
+            tourn.wins[g[0]] += 1
+            tourn.wins[g[1]] += 1
+        elif g[2][0] == "double loss":
             tourn.losses[g[0]] += 1
-        if g[2] != g[1]:
             tourn.losses[g[1]] += 1
-        if not g[2]:
-            continue
-        tourn.wins[g[2]] += 1
-        pset = frozenset(g[:2])
-        tourn.pair_counts[pset] += 1
+        # a "no decison" result doesn't assign any win or loss but does count
+        # as a game played
+        if g[2][0] != "vacated":
+            tourn.played[g[0]] += 1
+            tourn.played[g[1]] += 1
+            pset = frozenset(g[:2])
+            tourn.pair_counts[pset] += 1
     return tourn
 
 def weighted_pairing(tourn, scale):

@@ -81,7 +81,7 @@ def main(args=None):
     tourn = Tournament()
     with open(args.seed_file) as seed_file:
         tourn.players, tourn.seeds = parse_seeds(seed_file)
-    tourn.active = {p: True for p in tourn.players}
+    tourn.active = set(tourn.players)
     if args.history_file:
         with open(args.history_file) as history_file:
             tourn.games = parse_history(history_file, tourn.active)
@@ -91,7 +91,7 @@ def main(args=None):
     add_stats(tourn)
     stpr = rate(tourn.seeds, tourn.wins, tourn.pair_counts, args.virtual)
     tourn.live_players = [p for p in tourn.players
-            if tourn.active[p] and tourn.losses[p] < args.lives]
+            if (p in tourn.active) and tourn.losses[p] < args.lives]
     if args.utpr:
         utpr = rate({p: 1500 for p in tourn.players},
                 tourn.wins, tourn.pair_counts, args.virtual)
