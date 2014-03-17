@@ -80,11 +80,13 @@ def main(args=None):
         pass
     tourn = Tournament()
     with open(args.seed_file) as seed_file:
-        tourn.players, tourn.seeds = parse_seeds(seed_file)
+        seed_data = seed_file.read()
+        tourn.players, tourn.seeds = parse_seeds(seed_data)
     tourn.active = set(tourn.players)
     if args.history_file:
         with open(args.history_file) as history_file:
-            tourn.games = parse_history(history_file, tourn.active)
+            history_data = history_file.read()
+            tourn.games = parse_history(history_data, tourn.active)
     else:
         tourn.games = list()
 

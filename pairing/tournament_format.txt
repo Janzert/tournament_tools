@@ -16,6 +16,11 @@ Player's can be removed from pairing consideration with a remove line:
 Player's can be re-added for consideration with an add line:
     add <name>
 
+A bye is indicated with:
+bye <name>
+Byes can be forcefully counted as a win or loss with:
+bye <name> [win|loss]
+
 Game results are given with:
     game <player 1> <player 2> <result>
 The words pair or pick can also be used in place of game.

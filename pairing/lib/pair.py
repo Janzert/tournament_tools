@@ -5,11 +5,11 @@ from collections import Counter, defaultdict
 
 from mwmatching import maxWeightMatching
 
-def parse_seeds(seed_file):
+def parse_seeds(seed_data):
     """ Parse aaaa style seed file """
     players = []
     seeds = dict()
-    for line_num, line in enumerate(seed_file.readlines(), start=1):
+    for line_num, line in enumerate(seed_data.splitlines(), start=1):
         line = line.strip()
         if len(line) == 0 or line.startswith("#"):
             continue
@@ -23,30 +23,30 @@ def parse_seeds(seed_file):
         seeds[player] = rating
     return tuple(players), seeds
 
-def parse_history(history_file, active):
+def parse_history(history_data, active):
     """ Parse aaaa style game history file """
     games = list()
-    for line_num, line in enumerate(history_file.readlines(), start=1):
+    for line_num, line in enumerate(history_data.splitlines(), start=1):
         line = line.strip()
         if len(line) == 0 or line.startswith("#"):
             continue
         words = line.split()
         p1 = words[0]
-        if p1 not in active:
-            raise ValueError(
-                    "Unrecognized player 1 (%s) in history at line %d",
-                    p1, line_num)
         if len(words) == 1:
             if p1 in active:
                 active.remove(p1)
             else:
                 active.add(p1)
             continue
+        if p1 not in active:
+            raise ValueError(
+                    "Unrecognized player 1 (%s) in history at line %d" % (
+                    p1, line_num))
         p2 = words[1]
         if p2 not in active:
             raise ValueError(
-                    "Unrecognized player 2 (%s) in history at line %d",
-                    p2, line_num)
+                    "Unrecognized player 2 (%s) in history at line %d" % (
+                    p2, line_num))
         if len(words) == 2:
             # double forfeit
             games.append((p1, p2, ("double loss",)))
@@ -54,21 +54,21 @@ def parse_history(history_file, active):
         winner = words[2]
         if winner not in (p1, p2):
             raise ValueError(
-                    "Winner (%s) not a player of game in history at line %d",
-                    winner, line_num)
+                    "Winner (%s) not a player of game in history at line %d" % (
+                    winner, line_num))
         games.append((p1, p2, ("winner", winner)))
+    games = tuple(games)
     return games
 
 def parse_tournament(tourn_state):
     players = set()
     seeds = dict()
     games = list()
-    def parse_player(line):
-        raise ValueError("error at {}".format(line_num))
+    def parse_player(line_num, line):
         tokens = line.split()
         if len(tokens) != 2:
             raise ValueError("Bad player entry at line %d" % (line_num,))
-        name, seed = toks
+        name, seed = tokens
         seed = float(seed)
         if name in seeds:
             raise ValueError(
@@ -90,27 +90,39 @@ def parse_tournament(tourn_state):
             raise ValueError("Tried to re-add unknown player %s at line %d" % (
                 line, line_num))
         players.add(line)
+    def parse_bye(line_num, line):
+        tokens = line.split()
+        if len(tokens) == 2:
+            player, result = tokens
+        else:
+            player = line
+        if player not in seeds:
+            raise ValueError("Gave bye to unknown player %s at line %d" % (
+                line, line_num))
+        if player not in players:
+            raise ValueError("Gave bye to removed player %s at line %d" % (
+                line, line_num))
     def parse_game(line_num, line):
         tokens = line.split(None, 2)
         if len(tokens) != 3:
             raise ValueError("Bad game entry at line %d" % (line_num,))
         p1, p2, result = tokens
         if p1 not in seeds:
-            ValueError("Unknown player 1 '%s' in game at line %d" % (
+            raise ValueError("Unknown player 1 '%s' in game at line %d" % (
                 p1, line_num))
         if p2 not in seeds:
-            ValueError("Unknown player 2 '%s' in game at line %d" % (
+            raise ValueError("Unknown player 2 '%s' in game at line %d" % (
                 p2, line_num))
         if result.startswith("winner"):
             tokens = result.split(None, 1)
             if len(tokens) != 2:
-                ValueError("Bad game result at line %d" % (line_num,))
+                raise ValueError("Bad game result at line %d" % (line_num,))
             winner = tokens[1]
             if winner not in (p1, p2):
                 raise ValueError(
                         "Recorded winner %s not a player in game at line %d" % (
                             winner, line_num))
-            games.append((p1, p2, ("win", winner)))
+            games.append((p1, p2, ("winner", winner)))
         elif result in ("draw", "double win", "double loss", "no decision",
                 "vacated"):
             games.append((p1, p2, (result,)))
@@ -121,11 +133,12 @@ def parse_tournament(tourn_state):
             "player": parse_player,
             "remove": parse_remove,
             "add": parse_add,
+            "bye": parse_bye,
             "game": parse_game,
             "pair": parse_game,
             "pick": parse_game,
             }
-    for line_num, line in enumerate(tourn_state, start=1):
+    for line_num, line in enumerate(tourn_state.splitlines(), start=1):
         line = line.strip()
         if len(line) == 0 or line[0] == "#" or line[0] == "*":
             continue
@@ -141,7 +154,7 @@ def parse_tournament(tourn_state):
         except KeyError:
             raise ValueError("Unrecognized line type %s at line %d" % (
                 ltype, line_num))
-    players = tuple(players)
+    players = frozenset(players)
     games = tuple(games)
     return players, seeds, games
 
