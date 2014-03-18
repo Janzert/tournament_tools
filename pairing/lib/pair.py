@@ -5,6 +5,41 @@ from collections import Counter, defaultdict
 
 from mwmatching import maxWeightMatching
 
+class Tournament(object):
+    def __init__(self):
+        self.players = frozenset()
+        self.seeds = dict()
+        self.games = tuple()
+
+    def update_stats(tourn):
+        tourn.played = Counter()
+        tourn.wins = Counter()
+        tourn.draws = Counter()
+        tourn.losses = Counter()
+        tourn.pair_counts = Counter()
+        for g in tourn.games:
+            if g[2][0] == "winner":
+                if g[2][1] != g[0]:
+                    tourn.losses[g[0]] += 1
+                if g[2][1] != g[1]:
+                    tourn.losses[g[1]] += 1
+                tourn.wins[g[2][1]] += 1
+            elif g[2][0] == "draw":
+                tourn.draws[g[0]] += 1
+                tourn.draws[g[1]] += 1
+            elif g[2][0] == "double win":
+                tourn.wins[g[0]] += 1
+                tourn.wins[g[1]] += 1
+            elif g[2][0] == "double loss":
+                tourn.losses[g[0]] += 1
+                tourn.losses[g[1]] += 1
+            if g[2][0] != "vacated":
+                pset = frozenset(g[:2])
+                tourn.pair_counts[pset] += 1
+            tourn.played[g[0]] += 1
+            tourn.played[g[1]] += 1
+        return tourn
+
 def parse_seeds(seed_data):
     """ Parse aaaa style seed file """
     players = []
@@ -154,9 +189,12 @@ def parse_tournament(tourn_state):
         except KeyError:
             raise ValueError("Unrecognized line type %s at line %d" % (
                 ltype, line_num))
-    players = frozenset(players)
-    games = tuple(games)
-    return players, seeds, games
+    tourn = Tournament()
+    tourn.players = frozenset(players)
+    tourn.seeds = seeds
+    tourn.games = tuple(games)
+    tourn.update_stats()
+    return tourn
 
 def rate(seeds, scores, pair_counts, virtual_weight):
     scores = Counter(scores)
@@ -208,37 +246,6 @@ def rate(seeds, scores, pair_counts, virtual_weight):
     ratings = {p: (math.log(r) / CF) + mid_rating
             for p, r in ratings.items()}
     return ratings
-
-def add_stats(tourn):
-    tourn.played = Counter()
-    tourn.wins = Counter()
-    tourn.draws = Counter()
-    tourn.losses = Counter()
-    tourn.pair_counts = Counter()
-    for g in tourn.games:
-        if g[2][0] == "winner":
-            if g[2][1] != g[0]:
-                tourn.losses[g[0]] += 1
-            if g[2][1] != g[1]:
-                tourn.losses[g[1]] += 1
-            tourn.wins[g[2][1]] += 1
-        elif g[2][0] == "draw":
-            tourn.draws[g[0]] += 1
-            tourn.draws[g[1]] += 1
-        elif g[2][0] == "double win":
-            tourn.wins[g[0]] += 1
-            tourn.wins[g[1]] += 1
-        elif g[2][0] == "double loss":
-            tourn.losses[g[0]] += 1
-            tourn.losses[g[1]] += 1
-        # a "no decison" result doesn't assign any win or loss but does count
-        # as a game played
-        if g[2][0] != "vacated":
-            tourn.played[g[0]] += 1
-            tourn.played[g[1]] += 1
-            pset = frozenset(g[:2])
-            tourn.pair_counts[pset] += 1
-    return tourn
 
 def weighted_pairing(tourn, scale):
     players = tourn.live_players

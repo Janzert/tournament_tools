@@ -9,7 +9,7 @@ sys.path.append(os.path.join(_base_dir, "lib"))
 
 from pair import (
         parse_seeds, parse_history,
-        add_stats, rate, weighted_pairing,
+        rate, Tournament, weighted_pairing,
         )
 
 class FTE_Scale(object):
@@ -76,8 +76,6 @@ def parse_args(args=None):
 
 def main(args=None):
     args = parse_args(args)
-    class Tournament(object):
-        pass
     tourn = Tournament()
     with open(args.seed_file) as seed_file:
         seed_data = seed_file.read()
@@ -87,10 +85,8 @@ def main(args=None):
         with open(args.history_file) as history_file:
             history_data = history_file.read()
             tourn.games = parse_history(history_data, tourn.active)
-    else:
-        tourn.games = list()
+    tourn.update_stats()
 
-    add_stats(tourn)
     stpr = rate(tourn.seeds, tourn.wins, tourn.pair_counts, args.virtual)
     tourn.live_players = [p for p in tourn.players
             if (p in tourn.active) and tourn.losses[p] < args.lives]

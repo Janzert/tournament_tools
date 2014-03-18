@@ -191,12 +191,10 @@ class ParseTestCase(unittest.TestCase):
             pair.parse_history(history_bad_winner, history_active)
 
     def test_parse_tournament(self):
-        results = pair.parse_tournament(tournament_state_good)
-        self.assertEqual(len(results), 3)
-        players, seeds, games = results
-        self.assertEqual(players, tournament_state_good_players)
-        self.assertEqual(seeds, tournament_state_good_seeds)
-        self.assertEqual(games, tournament_state_good_games)
+        tourn = pair.parse_tournament(tournament_state_good)
+        self.assertEqual(tourn.players, tournament_state_good_players)
+        self.assertEqual(tourn.seeds, tournament_state_good_seeds)
+        self.assertEqual(tourn.games, tournament_state_good_games)
         for state in bad_tournament_states:
             try:
                 with self.assertRaises(ValueError):
