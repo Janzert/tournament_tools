@@ -2,7 +2,7 @@ This tournament state file format is modelled after the format used by Omar's
 tournament simulator. It's expanded to cover more possible events in a
 tournament.
 
-Lines beginning with # or * are comments and the rest of the file is ignored.
+Lines beginning with # or * are comments and the rest of the line is ignored.
 
 Player's are added to a tournement with a player line:
     player <name> <seed rating>
