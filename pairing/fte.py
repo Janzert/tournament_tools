@@ -25,7 +25,7 @@ class FTE_Scale(object):
     def __init__(self, lives, tourn):
         self.lives = lives
         self.tourn = tourn
-        self.num_alive = len(tourn.live_players)
+        self.num_alive = len(tourn.players)
         if len(tourn.games):
             most_repeated_pairing = tourn.pair_counts.most_common(1)[0][1]
             self.pair_mul = (self.num_alive + 1) ** most_repeated_pairing
@@ -100,8 +100,8 @@ def main(args=None):
                 parse_history(tourn, history_data)
 
     stpr = rate(tourn.seeds, tourn.wins, tourn.pair_counts, args.virtual)
-    tourn.live_players = [p for p in tourn.players
-            if tourn.losses[p] < args.lives]
+    tourn.players = set([p for p in tourn.players
+        if tourn.losses[p] < args.lives])
     if args.utpr:
         utpr = rate({p: 1500 for p in tourn.players},
                 tourn.wins, tourn.pair_counts, args.virtual)
@@ -110,10 +110,10 @@ def main(args=None):
     else:
         def order(p):
             return (tourn.losses[p], -stpr[p])
-    tourn.live_players.sort(key=order)
-    tourn.ranks = {p: rank for rank, p in enumerate(tourn.live_players, start=1)}
+    sorted_players = sorted(tourn.players, key=order)
+    tourn.ranks = {p: rank for rank, p in enumerate(sorted_players, start=1)}
     if args.ranks:
-        for r, p in enumerate(tourn.live_players, 1):
+        for r, p in enumerate(sorted_players, 1):
             print "#", r, p, order(p)
     scale = FTE_Scale(args.lives, tourn)
     pairings, bye = weighted_pairing(tourn, scale)

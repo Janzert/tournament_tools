@@ -280,7 +280,7 @@ def rate(seeds, scores, pair_counts, virtual_weight):
     return ratings
 
 def weighted_pairing(tourn, scale):
-    players = tourn.live_players
+    players = list(tourn.players)
     num_alive = len(players)
 
     weights = []
