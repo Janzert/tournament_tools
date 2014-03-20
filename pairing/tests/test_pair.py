@@ -209,6 +209,13 @@ player player1 1234
 player player2 1234
 game player1 player2 nonexistent
 """
+tournament_state_bad_game_6 = """\
+player player1 1234
+player player2 1234
+player player3 1234
+remove player3
+game player1 player3 winner player1
+"""
 bad_tournament_states = [
         tournament_state_bad_name,
         tournament_state_bad_rating,
@@ -221,6 +228,7 @@ bad_tournament_states = [
         tournament_state_bad_game_3,
         tournament_state_bad_game_4,
         tournament_state_bad_game_5,
+        tournament_state_bad_game_6,
         ]
 
 class ParseTestCase(unittest.TestCase):

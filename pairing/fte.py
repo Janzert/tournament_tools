@@ -9,7 +9,7 @@ sys.path.append(os.path.join(_base_dir, "lib"))
 
 from pair import (
         parse_seeds, parse_history, parse_tournament,
-        rate, Tournament, weighted_pairing,
+        rate, weighted_pairing,
         )
 
 class FTE_Scale(object):

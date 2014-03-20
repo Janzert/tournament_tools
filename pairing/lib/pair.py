@@ -166,8 +166,14 @@ def parse_tournament(tourn_state):
         if p1 not in seeds:
             raise ValueError("Unknown player 1 '%s' in game at line %d" % (
                 p1, line_num))
+        if p1 not in players:
+            raise ValueError("Removed player '%s' in game at line %d" % (
+                p1, line_num))
         if p2 not in seeds:
             raise ValueError("Unknown player 2 '%s' in game at line %d" % (
+                p2, line_num))
+        if p2 not in players:
+            raise ValueError("Removed player '%s' in game at line %d" % (
                 p2, line_num))
         if result.startswith("winner"):
             tokens = result.split(None, 1)
