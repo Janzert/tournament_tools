@@ -23,6 +23,10 @@ seeds_good = """\
 player1 1234.0
 player2 123
 """
+seeds_good_eventlist = (
+        ("seed", ("player1", 1234.0)),
+        ("seed", ("player2", 123)),
+        )
 
 history_players = frozenset([
         "player1",
@@ -42,6 +46,17 @@ player2 player4 player4
 # last round
 player3 player2
 """
+
+history_good_eventlist = (
+        ("game", ("player1", "player2", ("winner", "player1"))),
+        ("game", ("player3", "player4", ("winner", "player4"))),
+        ("remove", ("player2",)),
+        ("game", ("player4", "player1", ("winner", "player1"))),
+        ("add", ("player2",)),
+        ("game", ("player1", "player3", ("winner", "player3"))),
+        ("game", ("player2", "player4", ("winner", "player4"))),
+        ("game", ("player3", "player2", ("double loss",))),
+        )
 
 history_good_games = (
         ("player1", "player2", ("winner", "player1")),
@@ -91,6 +106,25 @@ game player4 player3 vacated
 bye player2 win
 bye player3 loss
 """
+
+tournament_state_good_eventlist = (
+        ("seed", ("player1", 1234.5)),
+        ("seed", ("player2", 1200)),
+        ("seed", ("player3", 1150.3)),
+        ("seed", ("player4", 1100.2)),
+        ("game", ("player1", "player2", ("winner", "player1"))),
+        ("game", ("player3", "player4", ("winner", "player3"))),
+        ("remove", ("player2",)),
+        ("bye", ("player3", None)),
+        ("game", ("player4", "player1", ("double loss",))),
+        ("add", ("player2",)),
+        ("game", ("player1", "player3", ("double win",))),
+        ("game", ("player2", "player4", ("no decision",))),
+        ("game", ("player2", "player1", ("draw",))),
+        ("game", ("player4", "player3", ("vacated",))),
+        ("bye", ("player2", "win")),
+        ("bye", ("player3", "loss")),
+        )
 
 tournament_state_good_players = frozenset([
     "player1", "player2", "player3", "player4"])
@@ -177,6 +211,7 @@ class ParseTestCase(unittest.TestCase):
         with self.assertRaises(ValueError):
             pair.parse_seeds(seeds_bad_name)
         tourn = pair.parse_seeds(seeds_good)
+        self.assertEqual(tourn.events, seeds_good_eventlist)
         self.assertEqual(tourn.players, frozenset(("player1", "player2")))
         self.assertEqual(tourn.seeds, {"player1": 1234.0, "player2": 123})
 
@@ -187,6 +222,7 @@ class ParseTestCase(unittest.TestCase):
             return tourn
         tourn = test_tourn()
         pair.parse_history(tourn, history_good)
+        self.assertEqual(tourn.events, history_good_eventlist)
         self.assertEqual(tourn.games, history_good_games)
         with self.assertRaises(ValueError):
             pair.parse_history(test_tourn(), history_removed_player)
@@ -195,6 +231,7 @@ class ParseTestCase(unittest.TestCase):
 
     def test_parse_tournament(self):
         tourn = pair.parse_tournament(tournament_state_good)
+        self.assertEqual(tourn.events, tournament_state_good_eventlist)
         self.assertEqual(tourn.players, tournament_state_good_players)
         self.assertEqual(tourn.seeds, tournament_state_good_seeds)
         self.assertEqual(tourn.games, tournament_state_good_games)
