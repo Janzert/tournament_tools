@@ -56,10 +56,15 @@ def parse_seeds(seed_data):
                     player, line_num)
         players.append(player)
         seeds[player] = rating
-    return tuple(players), seeds
+    tourn = Tournament()
+    tourn.players = frozenset(players)
+    tourn.seeds = seeds
+    tourn.update_stats()
+    return tourn
 
-def parse_history(history_data, active):
+def parse_history(tourn, history_data):
     """ Parse aaaa style game history file """
+    active = set(tourn.players)
     games = list()
     for line_num, line in enumerate(history_data.splitlines(), start=1):
         line = line.strip()
@@ -92,8 +97,9 @@ def parse_history(history_data, active):
                     "Winner (%s) not a player of game in history at line %d" % (
                     winner, line_num))
         games.append((p1, p2, ("winner", winner)))
-    games = tuple(games)
-    return games
+    tourn.players = frozenset(active)
+    tourn.games = tuple(games)
+    tourn.update_stats()
 
 def parse_tournament(tourn_state):
     players = set()
