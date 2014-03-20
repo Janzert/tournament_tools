@@ -205,7 +205,7 @@ def parse_tournament(tourn_state):
         tokens = line.split(None, 1)
         if len(tokens) > 1:
             ltype, lrest = tokens
-        elif toks[0] == "stop":
+        elif tokens[0] == "stop":
             break
         else:
             raise ValueError("Unrecognized entry at line %d" % (line_num,))

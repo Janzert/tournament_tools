@@ -8,7 +8,7 @@ _base_dir = os.path.dirname(os.path.abspath(__file__))
 sys.path.append(os.path.join(_base_dir, "lib"))
 
 from pair import (
-        parse_seeds, parse_history,
+        parse_seeds, parse_history, parse_tournament,
         rate, Tournament, weighted_pairing,
         )
 
@@ -69,20 +69,35 @@ def parse_args(args=None):
             action="store_true")
     parser.add_argument("--ranks", help="Print player rankings",
             action="store_true")
-    parser.add_argument("seed_file", help="File with player seeds")
-    parser.add_argument("history_file", help="File with tournament history",
+    parser.add_argument("--seed_file", "--seeds", help="aaaa style player seeds")
+    parser.add_argument("--game_file", "--games",
+            help="aaaa style tournament history")
+    parser.add_argument("tournament_state", help="Tournament state file",
             nargs="?")
-    return parser.parse_args(args)
+    args = parser.parse_args(args)
+    if args.seed_file and args.tournament_state:
+        print "Cannot use both regular tournament state file and aaaa style"
+        parser.print_help()
+        sys.exit(1)
+    if not args.seed_file and not args.tournament_state:
+        print "Must give tournament state"
+        parser.print_help()
+        sys.exit(1)
+    return args
 
 def main(args=None):
     args = parse_args(args)
-    with open(args.seed_file) as seed_file:
-        seed_data = seed_file.read()
-        tourn = parse_seeds(seed_data)
-    if args.history_file:
-        with open(args.history_file) as history_file:
-            history_data = history_file.read()
-            parse_history(tourn, history_data)
+    if args.tournament_state:
+        with open(args.tournament_state) as state_file:
+            tourn = parse_tournament(state_file.read())
+    else:
+        with open(args.seed_file) as seed_file:
+            seed_data = seed_file.read()
+            tourn = parse_seeds(seed_data)
+        if args.game_file:
+            with open(args.game_file) as history_file:
+                history_data = history_file.read()
+                parse_history(tourn, history_data)
 
     stpr = rate(tourn.seeds, tourn.wins, tourn.pair_counts, args.virtual)
     tourn.live_players = [p for p in tourn.players

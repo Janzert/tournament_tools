@@ -142,6 +142,25 @@ tournament_state_good_games = (
         ("player4", "player3", ("vacated",)),
         )
 
+tournament_state_early_stop = """\
+player player1 1234.5
+player player2 1200
+player player3 1150.3
+player player4 1100.2
+
+# Round 1
+game player1 player2 winner player1
+stop
+game player3 player4 winner player3
+"""
+tournament_state_early_stop_eventlist = (
+        ("seed", ("player1", 1234.5)),
+        ("seed", ("player2", 1200)),
+        ("seed", ("player3", 1150.3)),
+        ("seed", ("player4", 1100.2)),
+        ("game", ("player1", "player2", ("winner", "player1"))),
+        )
+
 tournament_state_bad_name = """\
 player player name 1234
 """
@@ -235,6 +254,8 @@ class ParseTestCase(unittest.TestCase):
         self.assertEqual(tourn.players, tournament_state_good_players)
         self.assertEqual(tourn.seeds, tournament_state_good_seeds)
         self.assertEqual(tourn.games, tournament_state_good_games)
+        tourn = pair.parse_tournament(tournament_state_early_stop)
+        self.assertEqual(tourn.events, tournament_state_early_stop_eventlist)
         for state in bad_tournament_states:
             try:
                 with self.assertRaises(ValueError):
