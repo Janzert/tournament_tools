@@ -3,12 +3,13 @@
 import os.path
 import sys
 from argparse import ArgumentParser
+from collections import Counter
 
 _base_dir = os.path.dirname(os.path.abspath(__file__))
 sys.path.append(os.path.join(_base_dir, "lib"))
 
 from pair import (
-        parse_seeds, parse_history, parse_tournament,
+        from_eventlist, parse_seeds, parse_history, parse_tournament,
         rate, weighted_pairing,
         )
 
@@ -59,6 +60,29 @@ class FTE_Scale(object):
                 self.tourn.ranks[p1] - self.tourn.ranks[p2]) ** 2
         return weight
 
+def filter_games(tourn, lives):
+    losses = Counter()
+    events = list()
+    for event in tourn.events:
+        if event[0] != "game":
+            events.append(event)
+            continue
+        p1, p2, result = event[1]
+        if losses[p1] >= lives and losses[p2] >= lives:
+            continue
+        if losses[p1] >= lives or losses[p2] >= lives:
+            raise ValueError(
+                "Found game between active and eliminated player, %s vs %s" % (
+                    p1, p2))
+        events.append(event)
+        if result[0] == "winner":
+            loser = p1 if result[1] == p2 else p2
+            losses[loser] += 1
+        elif result[0] == "double loss":
+            losses[p1] += 1
+            losses[p2] += 1
+    return from_eventlist(events)
+
 def get_pairings(tourn, lives, virtual=0.5, use_utpr=False):
     stpr = rate(tourn.seeds, tourn.wins, tourn.pair_counts, virtual)
     tourn.players = set([p for p in tourn.players if tourn.losses[p] < lives])
@@ -84,6 +108,9 @@ def parse_args(args=None):
     parser.add_argument("-l", "--lives", help="Number of lives",
             type=int, default=3)
     parser.add_argument("--utpr", help="Use UTPR as in WC2013 pairing rules",
+            action="store_true")
+    parser.add_argument("--all-games",
+            help="Use all games, including those by eliminated players",
             action="store_true")
     parser.add_argument("--ranks", help="Print player rankings",
             action="store_true")
@@ -117,6 +144,8 @@ def main(args=None):
                 history_data = history_file.read()
                 parse_history(tourn, history_data)
 
+    if not args.all_games:
+        tourn = filter_games(tourn, args.lives)
     pairings, bye = get_pairings(tourn, args.lives, args.virtual, args.utpr)
     if args.ranks:
         players = sorted(tourn.players, key=lambda p: tourn.ranks[p])

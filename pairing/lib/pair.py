@@ -41,6 +41,89 @@ class Tournament(object):
             tourn.played[g[1]] += 1
         return tourn
 
+def from_eventlist(events):
+    players = set()
+    seeds = dict()
+    games = list()
+    def player_event(event_num, info):
+        name, seed = info
+        if name in seeds:
+            raise ValueError(
+                    "Duplicate player entry found for %s at event %d" % (
+                        name, event_num))
+        seeds[name] = seed
+        players.add(name)
+    def remove_event(event_num, info):
+        player = info[0]
+        if player not in seeds:
+            raise ValueError("Tried to remove unknown player %s at event %d" % (
+                player, event_num))
+        if player not in players:
+            raise ValueError(
+                    "Tried to remove already removed player %s at event %d" % (
+                        player, event_num))
+        players.remove(player)
+    def add_event(event_num, info):
+        if info not in seeds:
+            raise ValueError("Tried to re-add unknown player %s at event %d" % (
+                event, event_num))
+        players.add(player)
+    def bye_event(event_num, info):
+        player, result = info
+        if player not in seeds:
+            raise ValueError("Gave bye to unknown player %s at line %d" % (
+                line, line_num))
+        if player not in players:
+            raise ValueError("Gave bye to removed player %s at line %d" % (
+                line, line_num))
+    def game_event(event_num, info):
+        p1, p2, result = info
+        if p1 not in seeds:
+            raise ValueError("Unknown player 1 '%s' in game at event %d" % (
+                p1, event_num))
+        if p1 not in players:
+            raise ValueError("Removed player '%s' in game at event %d" % (
+                p1, event_num))
+        if p2 not in seeds:
+            raise ValueError("Unknown player 2 '%s' in game at event %d" % (
+                p2, event_num))
+        if p2 not in players:
+            raise ValueError("Removed player '%s' in game at event %d" % (
+                p2, event_num))
+        if result[0] == "winner":
+            winner = result[1]
+            if winner not in (p1, p2):
+                raise ValueError(
+                        "Recorded winner %s not a player in game at event %d" % (
+                            winner, event_num))
+            games.append(info)
+        elif result in ("draw", "double win", "double loss", "no decision",
+                "vacated"):
+            games.append(game)
+        else:
+            raise ValueError("Unrecognized result %s for game at event %d" % (
+                result, event_num))
+    type_handlers = {
+            "seed": player_event,
+            "remove": remove_event,
+            "add": add_event,
+            "bye": bye_event,
+            "game": game_event,
+            }
+    for event_num, (event, info) in enumerate(events):
+        try:
+            type_handlers[event](event_num, info)
+        except KeyError:
+            raise ValueError("Unrecognized event type %s at event %d" % (
+                event, event_num))
+    tourn = Tournament()
+    tourn.events = tuple(events)
+    tourn.players = frozenset(players)
+    tourn.seeds = seeds
+    tourn.games = tuple(games)
+    tourn.update_stats()
+    return tourn
+
 def parse_seeds(seed_data):
     """ Parse aaaa style seed file """
     events = []
