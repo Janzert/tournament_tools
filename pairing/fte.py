@@ -59,6 +59,24 @@ class FTE_Scale(object):
                 self.tourn.ranks[p1] - self.tourn.ranks[p2]) ** 2
         return weight
 
+def get_pairings(tourn, lives, virtual=0.5, use_utpr=False):
+    stpr = rate(tourn.seeds, tourn.wins, tourn.pair_counts, virtual)
+    tourn.players = set([p for p in tourn.players if tourn.losses[p] < lives])
+    if use_utpr:
+        utpr = rate({p: 1500 for p in tourn.players},
+                tourn.wins, tourn.pair_counts, virtual)
+        def order(p):
+            return (tourn.losses[p], -utpr[p], -stpr[p])
+    else:
+        def order(p):
+            return (tourn.losses[p], -stpr[p])
+    tourn.player_order = {p: order(p) for p in tourn.players}
+    sorted_players = sorted(tourn.players, key=order)
+    tourn.ranks = {p: rank for rank, p in enumerate(sorted_players, start=1)}
+    scale = FTE_Scale(lives, tourn)
+    pairings, bye = weighted_pairing(tourn, scale)
+    return pairings, bye
+
 def parse_args(args=None):
     parser = ArgumentParser(description="Pair FTE tournament")
     parser.add_argument("-v", "--virtual", help="Virtual game weight",
@@ -99,29 +117,16 @@ def main(args=None):
                 history_data = history_file.read()
                 parse_history(tourn, history_data)
 
-    stpr = rate(tourn.seeds, tourn.wins, tourn.pair_counts, args.virtual)
-    tourn.players = set([p for p in tourn.players
-        if tourn.losses[p] < args.lives])
-    if args.utpr:
-        utpr = rate({p: 1500 for p in tourn.players},
-                tourn.wins, tourn.pair_counts, args.virtual)
-        def order(p):
-            return (tourn.losses[p], -utpr[p], -stpr[p])
-    else:
-        def order(p):
-            return (tourn.losses[p], -stpr[p])
-    sorted_players = sorted(tourn.players, key=order)
-    tourn.ranks = {p: rank for rank, p in enumerate(sorted_players, start=1)}
+    pairings, bye = get_pairings(tourn, args.lives, args.virtual, args.utpr)
     if args.ranks:
-        for r, p in enumerate(sorted_players, 1):
-            print "#", r, p, order(p)
-    scale = FTE_Scale(args.lives, tourn)
-    pairings, bye = weighted_pairing(tourn, scale)
+        players = sorted(tourn.players, key=lambda p: tourn.ranks[p])
+        for p in players:
+            print "#", tourn.ranks[p], p, tourn.player_order[p]
 
     if bye:
-        print "# Bye:", bye
+        print "bye", bye
     for p1, p2 in pairings:
-        print p1, p2
+        print "game", p1, p2
 
 if __name__ == "__main__":
     main()
