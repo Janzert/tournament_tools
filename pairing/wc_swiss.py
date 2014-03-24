@@ -9,7 +9,7 @@ _base_dir = os.path.dirname(os.path.abspath(__file__))
 sys.path.append(os.path.join(_base_dir, "lib"))
 
 from pair import (
-        parse_seeds, parse_history, parse_tournament,
+        assign_colors, parse_seeds, parse_history, parse_tournament,
         rate, weighted_pairing,
         )
 
@@ -121,6 +121,9 @@ def parse_args(args=None):
             action="store_true")
     parser.add_argument("--ranks", help="Print player rankings",
             action="store_true")
+    parser.add_argument("--show-arbitrary",
+            help="Indicate arbitrary color assignments",
+            action="store_true")
     parser.add_argument("--seed_file", "--seeds",
             help="aaaa style player seeds")
     parser.add_argument("--history_file", "--games",
@@ -158,10 +161,15 @@ def main(args=None):
         for p in players:
             print "#", tourn.ranks[p], p, tourn.player_order[p]
 
+    pairings, arbitrary = assign_colors(tourn, pairings)
+
     if bye:
         print "bye", bye
     for p1, p2 in pairings:
-        print "game", p1, p2
+        if args.show_arbitrary:
+            print "game", p1, p2, "A" if (p1, p2) in arbitrary else ""
+        else:
+            print "game", p1, p2
 
 if __name__ == "__main__":
     main()

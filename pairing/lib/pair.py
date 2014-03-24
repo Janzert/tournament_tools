@@ -1,4 +1,5 @@
 
+import hashlib
 import math
 import sys
 from collections import Counter, defaultdict
@@ -388,4 +389,84 @@ def weighted_pairing(tourn, scale):
             if p2_ix != num_alive and p1_ix < p2_ix
             ]
     return pairings, bye
+
+def assign_colors(tourn, pairings):
+    """
+    1. Assign Gold to the player with a lower total of previous games as Gold minus previous games as Silver.
+    2. Assign Gold to the player with fewer previous games as Gold among games between the two players.
+    3. Break both color streaks, i.e. give both players a different color then the color they played with in their most recent game.
+    4. Break the color streak of the player with the longer streak.
+    5. Swap colors with respect to the last time the two players played against each other.
+    6. Assign color arbitrarily.
+    """
+    tourn_hash = hashlib.sha256()
+    tourn_hash.update("\n".join(sorted(tourn.players)))
+    tourn_hash.update("\n")
+    tourn_hash.update("\n".join(sorted("%s %s" % g[:2] for g in tourn.games)))
+    extra_gold = Counter()
+    prev_pair = Counter()
+    p1_streak = Counter()
+    p2_streak = Counter()
+    last_pairing = dict()
+    for p1, p2, result in tourn.games:
+        if result[0] == "vacated":
+            continue
+        extra_gold[p1] += 1
+        extra_gold[p2] -= 1
+        prev_pair[(p1, p2)] += 1
+        p1_streak[p1] += 1
+        p2_streak[p1] = 0
+        p1_streak[p2] = 0
+        p2_streak[p2] += 1
+        last_pairing[frozenset((p1, p2))] = p1
+    games = list()
+    arbitrary = set()
+    for p1, p2 in pairings:
+        # 1 p1 to player with less previous (games as p1 - games as p2)
+        if extra_gold[p1] != extra_gold[p2]:
+            if extra_gold[p2] < extra_gold[p1]:
+                p1, p2 = p2, p1
+            games.append((p1, p2))
+            continue
+        # 2 p1 to player with fewer games as p1 in games against p2
+        if prev_pair[(p1, p2)] != prev_pair[(p2, p1)]:
+            if prev_pair[(p1, p2)] > prev_pair[(p2, p1)]:
+                    p1, p2 = p2, p1
+            games.append((p1, p2))
+            continue
+        # 3 break both player's color streak
+        if p1_streak[p1] > 0 and p2_streak[p2] > 0:
+            games.append((p2, p1))
+            continue
+        elif p2_streak[p1] > 0 and p1_streak[p2] > 0:
+            games.append((p1, p2))
+            continue
+        # 4 break the color streak of the player with the longest streak
+        p1_max = max(p1_streak[p1], p2_streak[p1])
+        p2_max = max(p1_streak[p2], p2_streak[p2])
+        if p1_max != p2_max:
+            if ((p1_max > p2_max and p1_streak[p1] > 0)
+                    or (p2_max > p1_max and p2_streak[p2] > 0)):
+                p1, p2 = p2, p1
+            games.append((p1, p2))
+            continue
+        # 5 swap colors from last game they played against each other
+        if frozenset((p1, p2)) in last_pairing:
+            if last_pairing[frozenset((p1, p2))] == p1:
+                p1, p2 = p2, p1
+            games.append((p1, p2))
+            continue
+        # 6 assign colors arbitrarily
+        p1_hash = tourn_hash.copy()
+        p1_hash.update("\n%s %s" % (p1, p2))
+        p1_hash = int(p1_hash.hexdigest(), 16)
+        p2_hash = tourn_hash.copy()
+        p2_hash.update("\n%s %s" % (p2, p1))
+        p2_hash = int(p2_hash.hexdigest(), 16)
+        if p2_hash < p1_hash:
+            p1, p2 = p2, p1
+        game = (p1, p2)
+        games.append(game)
+        arbitrary.add(game)
+    return games, arbitrary
 
