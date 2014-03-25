@@ -51,7 +51,7 @@ class Swiss_Scale(object):
         num_alive = self.num_alive
 
         # 2 bye to fewest bye player
-        weight = self.most_games - self.tourn.played[player]
+        weight = self.tourn.byes[player]
         # 3 descending order of N, minimize number of pairings for Nth time
         weight *= self.pair_mul
         # 4 bye to most losses

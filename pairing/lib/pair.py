@@ -12,6 +12,7 @@ class Tournament(object):
         self.players = frozenset()
         self.seeds = dict()
         self.games = tuple()
+        self.byes = Counter()
 
     def update_stats(tourn):
         tourn.played = Counter()
@@ -46,6 +47,7 @@ def from_eventlist(events):
     players = set()
     seeds = dict()
     games = list()
+    byes = Counter()
     def player_event(event_num, info):
         name, seed = info
         if name in seeds:
@@ -77,6 +79,7 @@ def from_eventlist(events):
         if player not in players:
             raise ValueError("Gave bye to removed player %s at line %d" % (
                 line, line_num))
+        byes[player] += 1
     def game_event(event_num, info):
         p1, p2, result = info
         if p1 not in seeds:
@@ -122,6 +125,7 @@ def from_eventlist(events):
     tourn.players = frozenset(players)
     tourn.seeds = seeds
     tourn.games = tuple(games)
+    tourn.byes = byes
     tourn.update_stats()
     return tourn
 
@@ -194,12 +198,17 @@ def parse_history(tourn, history_data):
     tourn.players = frozenset(active)
     tourn.games = tuple(games)
     tourn.update_stats()
+    # format doesn't record byes so add games not played as byes
+    most_played = tourn.played.most_common(1)[0][1]
+    for p in tourn.seeds.keys():
+        tourn.byes[p] = most_played - tourn.played[p]
 
 def parse_tournament(tourn_state):
     events = list()
     players = set()
     seeds = dict()
     games = list()
+    byes = Counter()
     def parse_player(line_num, line):
         tokens = line.split()
         if len(tokens) != 2:
@@ -242,6 +251,7 @@ def parse_tournament(tourn_state):
             raise ValueError("Gave bye to removed player %s at line %d" % (
                 line, line_num))
         events.append(("bye", (player, result)))
+        byes[player] += 1
     def parse_game(line_num, line):
         tokens = line.split(None, 2)
         if len(tokens) != 3:
@@ -309,6 +319,7 @@ def parse_tournament(tourn_state):
     tourn.players = frozenset(players)
     tourn.seeds = seeds
     tourn.games = tuple(games)
+    tourn.byes = byes
     tourn.update_stats()
     return tourn
 
