@@ -13,6 +13,7 @@ class Tournament(object):
         self.seeds = dict()
         self.games = tuple()
         self.byes = Counter()
+        self.rounds = None
 
     def update_stats(tourn):
         tourn.played = Counter()
@@ -48,6 +49,7 @@ def from_eventlist(events):
     seeds = dict()
     games = list()
     byes = Counter()
+    cur_round = 0
     def player_event(event_num, info):
         name, seed = info
         if name in seeds:
@@ -101,18 +103,21 @@ def from_eventlist(events):
                         "Recorded winner %s not a player in game at event %d" % (
                             winner, event_num))
             games.append(info)
-        elif result in ("draw", "double win", "double loss", "no decision",
+        elif result[0] in ("draw", "double win", "double loss", "no decision",
                 "vacated"):
-            games.append(game)
+            games.append(info)
         else:
             raise ValueError("Unrecognized result %s for game at event %d" % (
                 result, event_num))
+    def round_event(event_num, info):
+        cur_round = info
     type_handlers = {
             "seed": player_event,
             "remove": remove_event,
             "add": add_event,
             "bye": bye_event,
             "game": game_event,
+            "round": round_event,
             }
     for event_num, (event, info) in enumerate(events):
         try:
@@ -126,6 +131,8 @@ def from_eventlist(events):
     tourn.seeds = seeds
     tourn.games = tuple(games)
     tourn.byes = byes
+    if cur_round != 0:
+        tourn.rounds = cur_round
     tourn.update_stats()
     return tourn
 
@@ -209,6 +216,7 @@ def parse_tournament(tourn_state):
     seeds = dict()
     games = list()
     byes = Counter()
+    cur_round = [0]
     def parse_player(line_num, line):
         tokens = line.split()
         if len(tokens) != 2:
@@ -289,6 +297,15 @@ def parse_tournament(tourn_state):
         else:
             raise ValueError("Unrecognized result %s for game at line %d" % (
                 result, line_num))
+    def parse_round(line_num, line):
+        try:
+            next_round = int(line)
+        except ValueError:
+            raise ValueError("Bad round entry at line %d" % (line_num,))
+        if next_round != cur_round[0] + 1:
+            raise ValueError("Out of order round found at line %d" % (line_num,))
+        cur_round[0] = next_round
+        events.append(("round", next_round))
     type_handlers = {
             "player": parse_player,
             "remove": parse_remove,
@@ -297,6 +314,7 @@ def parse_tournament(tourn_state):
             "game": parse_game,
             "pair": parse_game,
             "pick": parse_game,
+            "round": parse_round,
             }
     for line_num, line in enumerate(tourn_state.splitlines(), start=1):
         line = line.strip()
@@ -310,7 +328,7 @@ def parse_tournament(tourn_state):
         else:
             raise ValueError("Unrecognized entry at line %d" % (line_num,))
         try:
-            type_handlers[ltype](line_num, lrest)
+            type_handlers[ltype.lower()](line_num, lrest)
         except KeyError:
             raise ValueError("Unrecognized line type %s at line %d" % (
                 ltype, line_num))
@@ -320,6 +338,8 @@ def parse_tournament(tourn_state):
     tourn.seeds = seeds
     tourn.games = tuple(games)
     tourn.byes = byes
+    if cur_round[0] != 0:
+        tourn.rounds = cur_round[0]
     tourn.update_stats()
     return tourn
 
