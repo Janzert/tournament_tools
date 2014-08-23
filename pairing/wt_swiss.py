@@ -27,30 +27,32 @@ class Swiss_Scale(object):
         the Nth time.
     4. Give the bye to a player with as many losses as possible.
     5. In descending order of N, minimize the number of pairings between players
-        whose number of losses differ by N.
+        whose score differs by N.
     6. Give the bye to the player with the worst possible rank.
-    7. Minimize the sum of (for players with unequal losses, the square of their
-        rank difference) plus (for players with equal losses, the absolute
+    7. Minimize the sum of (for players with unequal scores, the square of their
+        rank difference) plus (for players with equal score, the absolute
         difference between their rank difference and half the number of players
-        with that number of losses).
+        with that score).
 
     """
     def __init__(self, tourn):
         self.tourn = tourn
         self.num_alive = len(tourn.players)
-        self.num_with_losses = Counter()
+        self.num_with_score = Counter()
         if len(tourn.games):
             most_repeated_pairing = tourn.pair_counts.most_common(1)[0][1]
             self.pair_mul = (self.num_alive + 1) ** most_repeated_pairing
             self.most_games = tourn.played.most_common(1)[0][1]
             self.most_losses = tourn.losses.most_common(1)[0][1]
+            self.rounds = tourn.rounds
             for p in tourn.players:
-                self.num_with_losses[tourn.losses[p]] += 1
+                self.num_with_score[tourn.score[p]] += 1
         else:
             self.pair_mul = 1
             self.most_games = 0
             self.most_losses = 0
-            self.num_with_losses[0] = len(tourn.players)
+            self.rounds = 0
+            self.num_with_score[0] = len(tourn.players)
 
     def bye(self, player):
         num_alive = self.num_alive
@@ -62,8 +64,8 @@ class Swiss_Scale(object):
         # 4 bye to most losses
         weight *= (self.most_losses + 1)
         weight += self.most_losses - self.tourn.losses[player]
-        # 5 descending order of N, minimize pairings with losses differing by N
-        weight *= (num_alive + 1) ** (self.most_losses + 1)
+        # 5 descending order of N, minimize pairings with scores differing by N
+        weight *= (num_alive + 1) ** (self.rounds + 1)
         # 6 bye to worst ranked
         weight *= (num_alive + 1)
         weight += self.num_alive - self.tourn.ranks[player]
@@ -73,23 +75,23 @@ class Swiss_Scale(object):
 
     def pair(self, p1, p2):
         num_alive = self.num_alive
-        losses = self.tourn.losses
+        score = self.tourn.score
 
         # 3 descending order of N, minimize number of pairings for Nth time
         weight = (num_alive + 1) ** self.tourn.pair_counts[frozenset((p1, p2))]
         # 4 bye to most losses
         weight *= (self.most_losses + 1)
-        # 5 descending order of N, minimize pairings with losses differing by N
-        weight *= (num_alive + 1) ** (self.most_losses + 1)
-        weight += (num_alive + 1) ** abs(losses[p1] - losses[p2])
+        # 5 descending order of N, minimize pairings with scores differing by N
+        weight *= (num_alive + 1) ** (self.rounds + 1)
+        weight += (num_alive + 1) ** abs(score[p1] - score[p2])
         # 6 bye to worst ranked
         weight *= (num_alive + 1)
         # 7 minimize rank differences
         weight *= (num_alive ** 2) + 1
         rank_difference = abs(self.tourn.ranks[p1] - self.tourn.ranks[p2])
-        if losses[p1] == losses[p2]:
+        if score[p1] == score[p2]:
             weight += abs(rank_difference - (
-                self.num_with_losses[losses[p1]] / 2.))
+                self.num_with_score[score[p1]] / 2.))
         else:
             weight += (rank_difference) ** 2
         return weight
@@ -110,9 +112,11 @@ def get_pairings(tourn, virtual=0.5):
                 "Games played by player %s is larger than number of rounds" %
                 (p,))
     stpr = rate(tourn.seeds, tourn.wins, tourn.pair_counts, virtual)
+    tourn.score = dict()
+    for p in tourn.players:
+        tourn.score[p] = tourn.wins[p] + ((rounds - tourn.played[p]) * 0.5)
     def order(p):
-        score = tourn.wins[p] + ((rounds - tourn.played[p]) * 0.5)
-        return (-score, -stpr[p])
+        return (-tourn.score[p], -stpr[p])
     tourn.player_order = {p: order(p) for p in tourn.players}
     sorted_players = sorted(tourn.players, key=order)
     tourn.ranks = {p: rank for rank, p in enumerate(sorted_players, start=1)}
