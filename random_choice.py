@@ -5,6 +5,9 @@ This expects to be given a yaml file that looks like:
 ---
 seed: H9gA9rKXroUPkMBa4dnjY55HDQct
 seed_hash: e516033c754ef4953fc20f9af22a4519498416b6
+# Add DJI closing price on Sep 23, 2014 into seed
+# Taken from http://finance.yahoo.com/q/hp?s=^DJI+Historical+Prices
+seed_add: 1705587
 
 selections: 5
 choices:
@@ -27,11 +30,11 @@ with the --gen-seed option.
 
 import argparse
 import base64
+import binascii
 import numbers
 import os
 import sys
 
-from binascii import hexlify, unhexlify
 from hashlib import sha1
 
 import yaml
@@ -89,10 +92,19 @@ def main(args):
             print("Must include random seed and hash.")
             return 1
         seed = base64.b64decode(config["seed"])
-        random = Random(seed)
         if config["seed_hash"] != sha1(seed).hexdigest():
             print("Seed does not match seed hash.")
             return 1
+
+        if "seed_add" not in config:
+            print("WARNING: No supplemental seed found.")
+        else:
+            # convert supplemental seed to byte sequence
+            sup_str = "%x" % (config["seed_add"],)
+            if len(sup_str) % 2 != 0:
+                sup_str = "0" + sup_str
+            seed += binascii.unhexlify(sup_str)
+        random = Random(seed)
         print("seed: " + config["seed"])
         if "choices" not in config:
             print("File does not contain list of choices")
