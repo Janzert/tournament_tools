@@ -65,7 +65,7 @@ class Swiss_Scale(object):
         weight *= (self.most_losses + 1)
         weight += self.most_losses - self.tourn.losses[player]
         # 5 descending order of N, minimize pairings with scores differing by N
-        weight *= (num_alive + 1) ** (self.rounds + 1)
+        weight *= (num_alive + 1) ** ((self.rounds * 2) + 1)
         # 6 bye to worst ranked
         weight *= (num_alive + 1)
         weight += self.num_alive - self.tourn.ranks[player]
@@ -82,16 +82,16 @@ class Swiss_Scale(object):
         # 4 bye to most losses
         weight *= (self.most_losses + 1)
         # 5 descending order of N, minimize pairings with scores differing by N
-        weight *= (num_alive + 1) ** (self.rounds + 1)
-        weight += (num_alive + 1) ** abs(score[p1] - score[p2])
+        weight *= (num_alive + 1) ** ((self.rounds * 2) + 1)
+        weight += (num_alive + 1) ** int(abs(score[p1] - score[p2]) * 2)
         # 6 bye to worst ranked
         weight *= (num_alive + 1)
         # 7 minimize rank differences
         weight *= (num_alive ** 2) + 1
         rank_difference = abs(self.tourn.ranks[p1] - self.tourn.ranks[p2])
         if score[p1] == score[p2]:
-            weight += abs(rank_difference - (
-                self.num_with_score[score[p1]] / 2.))
+            weight += int(abs(rank_difference - (
+                self.num_with_score[score[p1]] / 2.)) * 2)
         else:
             weight += (rank_difference) ** 2
         return weight
