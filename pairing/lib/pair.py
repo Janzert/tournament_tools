@@ -385,8 +385,8 @@ def rate(seeds, scores, pair_counts, virtual_weight):
         if new_error < old_error:
             best_rating = dict(new_rating)
         else:
-            br = sorted(best_rating.keys(), key=lambda p: best_rating[p])
-            nr = sorted(new_rating.keys(), key=lambda p: new_rating[p])
+            br = sorted(best_rating.keys(), key=lambda p: (best_rating[p], p))
+            nr = sorted(new_rating.keys(), key=lambda p: (new_rating[p], p))
             if br == nr:
                 count += 1
                 if count > 10:
