@@ -49,7 +49,7 @@ def from_eventlist(events):
     seeds = dict()
     games = list()
     byes = Counter()
-    cur_round = 0
+    cur_round = [0]
     def player_event(event_num, info):
         name, seed = info
         if name in seeds:
@@ -110,7 +110,7 @@ def from_eventlist(events):
             raise ValueError("Unrecognized result %s for game at event %d" % (
                 result, event_num))
     def round_event(event_num, info):
-        cur_round = info
+        cur_round[0] = info
     type_handlers = {
             "seed": player_event,
             "remove": remove_event,
@@ -131,8 +131,8 @@ def from_eventlist(events):
     tourn.seeds = seeds
     tourn.games = tuple(games)
     tourn.byes = byes
-    if cur_round != 0:
-        tourn.rounds = cur_round
+    if cur_round[0] != 0:
+        tourn.rounds = cur_round[0]
     tourn.update_stats()
     return tourn
 
@@ -358,6 +358,7 @@ def rate(seeds, scores, pair_counts, virtual_weight):
     old_rating = dict(seeds)
     old_error = float('inf')
     new_rating = dict()
+    count = 0
     while True:
         new_error = 0
         for player, seed in seeds.items():
@@ -382,13 +383,21 @@ def rate(seeds, scores, pair_counts, virtual_weight):
             new_rating[player] = max(0.5 * rating, rating - error / derivative)
             new_error += error ** 2
         if new_error < old_error:
-            old_error = new_error
-            old_rating = dict(new_rating)
+            best_rating = dict(new_rating)
         else:
-            break
+            br = sorted(best_rating.keys(), key=lambda p: best_rating[p])
+            nr = sorted(new_rating.keys(), key=lambda p: new_rating[p])
+            if br == nr:
+                count += 1
+                if count > 10:
+                    break
+            else:
+                count = 0
+        old_error = new_error
+        old_rating = dict(new_rating)
     # round to 12 significant decimal places
     ratings = {p: round(r, 11-int(math.floor(math.log10(r))))
-            for p, r in old_rating.items()}
+            for p, r in best_rating.items()}
     # convert back to elo range
     ratings = {p: (math.log(r) / CF) + mid_rating
             for p, r in ratings.items()}
