@@ -317,8 +317,10 @@ def parse_tournament(tourn_state):
             "round": parse_round,
             }
     for line_num, line in enumerate(tourn_state.splitlines(), start=1):
+        line = line.split("#")[0]
+        line = line.split("*")[0]
         line = line.strip()
-        if len(line) == 0 or line[0] == "#" or line[0] == "*":
+        if len(line) == 0:
             continue
         tokens = line.split(None, 1)
         if len(tokens) > 1:
