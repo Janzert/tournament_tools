@@ -154,7 +154,10 @@ def main(args=None):
     if args.ranks:
         players = sorted(tourn.players, key=lambda p: tourn.ranks[p])
         for p in players:
-            print "#", tourn.ranks[p], p, tourn.player_order[p]
+            print "#", tourn.ranks[p], p, tourn.player_order[p][0],
+            for r in tourn.player_order[p][1:]:
+                print -r,
+            print
 
     pairings, arbitrary = assign_colors(tourn, pairings)
 
