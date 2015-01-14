@@ -163,7 +163,7 @@ def parse_seeds(seed_data):
 
 def parse_history(tourn, history_data):
     """ Parse aaaa style game history file """
-    events = list()
+    events = list(tourn.events)
     active = set(tourn.players)
     games = list()
     for line_num, line in enumerate(history_data.splitlines(), start=1):
