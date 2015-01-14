@@ -206,9 +206,10 @@ def parse_history(tourn, history_data):
     tourn.games = tuple(games)
     tourn.update_stats()
     # format doesn't record byes so add games not played as byes
-    most_played = tourn.played.most_common(1)[0][1]
-    for p in tourn.seeds.keys():
-        tourn.byes[p] = most_played - tourn.played[p]
+    if tourn.played.most_common(1): # only check if there have been games played
+        most_played = tourn.played.most_common(1)[0][1]
+        for p in tourn.seeds.keys():
+            tourn.byes[p] = most_played - tourn.played[p]
 
 def parse_tournament(tourn_state):
     events = list()
