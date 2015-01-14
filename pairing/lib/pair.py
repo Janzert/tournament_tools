@@ -362,7 +362,7 @@ def rate(seeds, scores, pair_counts, virtual_weight):
     new_rating = dict()
     count = 0
     while True:
-        new_error = 0
+        new_error = list()
         for player, seed in seeds.items():
             rating = old_rating[player]
             # anchor
@@ -383,10 +383,13 @@ def rate(seeds, scores, pair_counts, virtual_weight):
             derivative = math.fsum(derivative)
             error = predicted_score - scores[player]
             new_rating[player] = max(0.5 * rating, rating - error / derivative)
-            new_error += error ** 2
+            new_error.append(error ** 2)
+        new_error = math.fsum(new_error)
         if new_error < old_error:
             best_rating = dict(new_rating)
         else:
+            if best_rating == new_rating:
+                break
             br = sorted(best_rating.keys(), key=lambda p: (best_rating[p], p))
             nr = sorted(new_rating.keys(), key=lambda p: (new_rating[p], p))
             if br == nr:
