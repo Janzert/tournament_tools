@@ -346,7 +346,9 @@ def parse_tournament(tourn_state):
     tourn.update_stats()
     return tourn
 
-def rate(seeds, scores, pair_counts, virtual_weight):
+def rate(seeds, tourn, virtual_weight):
+    scores = tourn.wins
+    pair_counts = tourn.pair_counts
     scores = Counter(scores)
     scores.update({p: 0.5 * virtual_weight for p in seeds.keys()})
     tuple_counts = defaultdict(int)
@@ -387,6 +389,7 @@ def rate(seeds, scores, pair_counts, virtual_weight):
             new_error.append(error ** 2)
         new_error = math.fsum(new_error)
         if new_error < old_error:
+            old_error = new_error
             best_rating = dict(new_rating)
         else:
             if best_rating == new_rating:
@@ -399,7 +402,6 @@ def rate(seeds, scores, pair_counts, virtual_weight):
                     break
             else:
                 count = 0
-        old_error = new_error
         old_rating = dict(new_rating)
     # round to 12 significant decimal places
     ratings = {p: round(r, 11-int(math.floor(math.log10(r))))
@@ -407,6 +409,68 @@ def rate(seeds, scores, pair_counts, virtual_weight):
     # convert back to elo range
     ratings = {p: (math.log(r) / CF) + mid_rating
             for p, r in ratings.items()}
+    return ratings
+
+def clyring_rate(seeds, tourn, virtual_weight):
+    def gradient_from(strength_diff):
+        return 1 / (1 + math.exp(strength_diff * math.log(10) / 400))
+
+    def get_gradients(seeds, ratings, wins, losses, prior):
+        gradients = dict()
+        players = ratings.keys()
+        for player in players:
+            prating = ratings[player]
+            prior_gradient = gradient_from(prating - seeds[player])
+            gradient = prior * prior_gradient - (prior / 2)
+            for opponent in players:
+                if opponent == player:
+                    continue
+                pair = (player, opponent)
+                op_gradient = gradient_from(prating - ratings[opponent])
+                gradient += wins[pair] * op_gradient
+                gradient += losses[pair] * (op_gradient - 1)
+            gradients[player] = gradient
+        return gradients
+
+    def get_hessians(seeds, ratings, wins, losses, prior):
+        hessians = dict()
+        players = ratings.keys()
+        for player in players:
+            prating = ratings[player]
+            prior_gradient = gradient_from(prating - seeds[player])
+            hessian = prior * prior_gradient * (1 - prior_gradient)
+            for opponent in players:
+                if opponent == player:
+                    continue
+                pair = (player, opponent)
+                faced = wins[pair] + losses[pair]
+                op_gradient = gradient_from(prating - ratings[opponent])
+                hessian += faced * op_gradient * (1 - op_gradient)
+            hessians[player] = hessian
+        return hessians
+
+    wins = defaultdict(int)
+    losses = defaultdict(int)
+    for event in tourn.games:
+        if event[2][0] == "winner":
+            w = event[2][1]
+            l = event[0] if w == event[1] else event[1]
+            wins[(w, l)] += 1
+            losses[(l, w)] += 1
+        else:
+            raise ValueError("Cannot handle game result type, %s" % (
+                event[2][0],))
+    ratings = dict(seeds)
+
+    NATELO = 400 / math.log(10)
+    gradients = get_gradients(seeds, ratings, wins, losses, virtual_weight)
+    while math.fsum(abs(g) for g in gradients.values()) > 0.000000001:
+        hessians = get_hessians(seeds, ratings, wins, losses, virtual_weight)
+        for player in seeds.keys():
+            prev = ratings[player]
+            ratings[player] += (gradients[player] * NATELO) / max(
+                    hessians[player], 0.3)
+        gradients = get_gradients(seeds, ratings, wins, losses, virtual_weight)
     return ratings
 
 def weighted_pairing(tourn, scale):

@@ -94,10 +94,9 @@ def filter_players(tourn, min_loss):
     tourn.players = frozenset(players)
 
 def get_pairings(tourn, virtual=0.5, use_utpr=False):
-    stpr = rate(tourn.seeds, tourn.wins, tourn.pair_counts, virtual)
+    stpr = rate(tourn.seeds, tourn, virtual)
     if use_utpr:
-        utpr = rate({p: 1500 for p in tourn.players},
-                tourn.wins, tourn.pair_counts, virtual)
+        utpr = rate({p: 1500 for p in tourn.seeds}, tourn, virtual)
         def order(p):
             return (tourn.losses[p], -utpr[p], -stpr[p])
     else:
@@ -162,6 +161,8 @@ def main(args=None):
             print "#", tourn.ranks[p], p, tourn.player_order[p]
 
     pairings, arbitrary = assign_colors(tourn, pairings)
+
+    pairings.sort(key=lambda pr: min(tourn.ranks[pr[0]], tourn.ranks[pr[1]]))
 
     if bye:
         print "bye", bye

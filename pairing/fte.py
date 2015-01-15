@@ -85,11 +85,10 @@ def filter_games(tourn, lives):
     return from_eventlist(events)
 
 def get_pairings(tourn, lives, virtual=0.5, use_utpr=False):
-    stpr = rate(tourn.seeds, tourn.wins, tourn.pair_counts, virtual)
+    stpr = rate(tourn.seeds, tourn, virtual)
     tourn.players = set([p for p in tourn.players if tourn.losses[p] < lives])
     if use_utpr:
-        utpr = rate({p: 1500 for p in tourn.players},
-                tourn.wins, tourn.pair_counts, virtual)
+        utpr = rate({p: 1500 for p in tourn.seeds}, tourn, virtual)
         def order(p):
             return (tourn.losses[p], -utpr[p], -stpr[p])
     else:
@@ -161,11 +160,13 @@ def main(args=None):
 
     pairings, arbitrary = assign_colors(tourn, pairings)
 
+    pairings.sort(key=lambda pr: min(tourn.ranks[pr[0]], tourn.ranks[pr[1]]))
+
     if bye:
         print "bye", bye
     for p1, p2 in pairings:
         if args.show_arbitrary:
-            print "game", p1, p2, "A" if (p1, p2) in arbitrary else ""
+            print "game", p1, p2, "# A" if (p1, p2) in arbitrary else ""
         else:
             print "game", p1, p2
 

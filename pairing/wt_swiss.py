@@ -111,7 +111,7 @@ def get_pairings(tourn, virtual=0.5):
         raise ValueError(
                 "Games played by player %s is larger than number of rounds" %
                 (p,))
-    stpr = rate(tourn.seeds, tourn.wins, tourn.pair_counts, virtual)
+    stpr = rate(tourn.seeds, tourn, virtual)
     tourn.score = dict()
     for p in tourn.players:
         tourn.score[p] = tourn.wins[p] + ((rounds - tourn.played[p]) * 0.5)
