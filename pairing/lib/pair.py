@@ -412,8 +412,10 @@ def rate(seeds, tourn, virtual_weight):
     return ratings
 
 def clyring_rate(seeds, tourn, virtual_weight):
+    NATELO = 400 / math.log(10)
+    INATELO = math.log(10) / 400
     def gradient_from(strength_diff):
-        return 1 / (1 + math.exp(strength_diff * math.log(10) / 400))
+        return 1 / (1 + math.exp(strength_diff * INATELO))
 
     def get_gradients(seeds, ratings, wins, losses, prior):
         gradients = dict()
@@ -462,15 +464,33 @@ def clyring_rate(seeds, tourn, virtual_weight):
                 event[2][0],))
     ratings = dict(seeds)
 
-    NATELO = 400 / math.log(10)
+    min_hessian = 0.5
     gradients = get_gradients(seeds, ratings, wins, losses, virtual_weight)
-    while math.fsum(abs(g) for g in gradients.values()) > 0.000000001:
+    magnitude = math.fsum(abs(g) for g in gradients.values())
+    while magnitude > 1e-09:
         hessians = get_hessians(seeds, ratings, wins, losses, virtual_weight)
         for player in seeds.keys():
             prev = ratings[player]
             ratings[player] += (gradients[player] * NATELO) / max(
-                    hessians[player], 0.3)
+                    hessians[player], min_hessian)
         gradients = get_gradients(seeds, ratings, wins, losses, virtual_weight)
+        new_magnitude = math.fsum(abs(g) for g in gradients.values())
+        if new_magnitude < magnitude:
+            min_hessian = max(min_hessian * 0.9, 0.2)
+        else:
+            min_hessian = min(min_hessian * 1.4, 1)
+        magnitude = new_magnitude
+    return ratings
+
+def compare_rate(seeds, tourn, virtual_weight):
+    ratings = rate(seeds, tourn, virtual_weight)
+    cratings = clyring_rate(seeds, tourn, virtual_weight)
+    if set(ratings.keys()) != set(cratings.keys()):
+        raise RuntimeError("Ratings have different players.")
+    for player, rating in ratings.items():
+        if round(rating, 2) != round(cratings[player], 2):
+            raise RuntimeError("Rating for player %s differed %f != %f" % (
+                player, round(rating, 2), round(cratings[player], 2)))
     return ratings
 
 def weighted_pairing(tourn, scale):
