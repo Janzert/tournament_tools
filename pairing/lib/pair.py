@@ -488,9 +488,9 @@ def compare_rate(seeds, tourn, virtual_weight):
     if set(ratings.keys()) != set(cratings.keys()):
         raise RuntimeError("Ratings have different players.")
     for player, rating in ratings.items():
-        if round(rating, 2) != round(cratings[player], 2):
+        if abs(rating - cratings[player]) > 0.01:
             raise RuntimeError("Rating for player %s differed %f != %f" % (
-                player, round(rating, 2), round(cratings[player], 2)))
+                player, rating, cratings[player]))
     return ratings
 
 def weighted_pairing(tourn, scale):
