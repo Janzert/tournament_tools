@@ -1,5 +1,6 @@
 #!/usr/bin/python
 
+import math
 import os.path
 import sys
 from argparse import ArgumentParser
@@ -14,6 +15,75 @@ from pair import (
         )
 
 class Swiss_Scale(object):
+    """
+    1. If an odd number of players remain, one bye will be given, otherwise
+       none.
+    2. Give the bye only to a player among the players with the fewest byes so
+       far.
+    3. In descending order of N, minimize the number of pairings occurring for
+       the Nth time.
+    4. In descending order of N, minimize the number of pairings between
+       players whose number of losses differ by N.
+    5. Give the bye to a player with as many losses as possible.
+    6. Maximize the sum over all pairs of the square roots of the absolute STPR
+       differences.
+    """
+    def __init__(self, tourn):
+        self.tourn = tourn
+        self.num_alive = len(tourn.players)
+        self.num_with_losses = Counter()
+        rating_list = tourn.stpr.values()
+        self.rating_range = int(math.ceil(max(rating_list) - min(rating_list)))
+        if len(tourn.games):
+            most_repeated_pairing = tourn.pair_counts.most_common(1)[0][1]
+            self.pair_mul = (self.num_alive + 1) ** most_repeated_pairing
+            self.most_games = tourn.played.most_common(1)[0][1]
+            self.most_losses = tourn.losses.most_common(1)[0][1]
+            for p in tourn.players:
+                self.num_with_losses[tourn.losses[p]] += 1
+        else:
+            self.pair_mul = 1
+            self.most_games = 0
+            self.most_losses = 0
+            self.num_with_losses[0] = len(tourn.players)
+
+    def bye(self, player):
+        num_alive = self.num_alive
+
+        # 2 bye to fewest bye player
+        weight = self.tourn.byes[player]
+        # 3 descending order of N, minimize number of pairings for Nth time
+        weight *= self.pair_mul
+        # 4 descending order of N, minimize pairings with losses differing by N
+        weight *= (num_alive + 1) ** (self.most_losses + 1)
+        # 5 bye to most losses
+        weight *= (self.most_losses + 1)
+        weight += self.most_losses - self.tourn.losses[player]
+        # 6 maximize sqrt rating difference
+        weight *= int(math.sqrt(self.rating_range) * 1000) + 1
+        return weight
+
+    def pair(self, p1, p2):
+        num_alive = self.num_alive
+        losses = self.tourn.losses
+
+        # 3 descending order of N, minimize number of pairings for Nth time
+        weight = (num_alive + 1) ** self.tourn.pair_counts[frozenset((p1, p2))]
+        # 4 descending order of N, minimize pairings with losses differing by N
+        weight *= (num_alive + 1) ** (self.most_losses + 1)
+        weight += (num_alive + 1) ** abs(losses[p1] - losses[p2])
+        # 5 bye to most losses
+        weight *= (self.most_losses + 1)
+        # 6 maximize sqrt rating difference
+        # need integer weights
+        # FIXME: this might break with small stpr differences
+        weight *= int(math.sqrt(self.rating_range) * 1000) + 1
+        weight += int(math.sqrt(self.rating_range) * 1000) + 1 - int(
+                math.sqrt(abs(self.tourn.stpr[p1] - self.tourn.stpr[p2])) * 1000)
+        print p1, p2, weight
+        return weight
+
+class Swiss_2015_Scale(object):
     """
     If an odd number of players remain, one bye will be given, otherwise none.
     2. Give the bye only to a player among the players with the fewest byes so
@@ -93,7 +163,11 @@ def filter_players(tourn, min_loss):
     players = [p for p in tourn.players if tourn.losses[p] >= min_loss]
     tourn.players = frozenset(players)
 
-def get_pairings(tourn, virtual=0.5, use_utpr=False):
+def get_pairings(tourn, config):
+    virtual = config.virtual if hasattr(config, "virtual") else 0.5
+    use_utpr = config.utpr if hasattr(config, "utpr") else False
+    use_2015 = config.wc2015 if hasattr(config, "wc2015") else False
+
     stpr = rate(tourn.seeds, tourn, virtual)
     if use_utpr:
         utpr = rate({p: 1500 for p in tourn.seeds}, tourn, virtual)
@@ -104,8 +178,12 @@ def get_pairings(tourn, virtual=0.5, use_utpr=False):
             return (tourn.losses[p], -stpr[p])
     tourn.player_order = {p: order(p) for p in tourn.players}
     sorted_players = sorted(tourn.players, key=order)
+    tourn.stpr = stpr
     tourn.ranks = {p: rank for rank, p in enumerate(sorted_players, start=1)}
-    scale = Swiss_Scale(tourn)
+    if use_2015:
+        scale = Swiss_2015_Scale(tourn)
+    else:
+        scale = Swiss_Scale(tourn)
     pairings, bye = weighted_pairing(tourn, scale)
     return pairings, bye
 
@@ -117,6 +195,8 @@ def parse_args(args=None):
             help="Number of lives before being paired",
             type=int, default=3)
     parser.add_argument("--utpr", help="Use UTPR as in WC2013 pairing rules",
+            action="store_true")
+    parser.add_argument("--wc2015", help="Use wc2015 pairing weights",
             action="store_true")
     parser.add_argument("--ranks", help="Print player rankings",
             action="store_true")
@@ -154,7 +234,7 @@ def main(args=None):
 
     if args.prelives > 0:
         filter_players(tourn, args.prelives)
-    pairings, bye = get_pairings(tourn, args.virtual, args.utpr)
+    pairings, bye = get_pairings(tourn, args)
     if args.ranks:
         players = sorted(tourn.players, key=lambda p: tourn.ranks[p])
         for p in players:
@@ -168,7 +248,7 @@ def main(args=None):
         print "bye", bye
     for p1, p2 in pairings:
         if args.show_arbitrary:
-            print "game", p1, p2, "A" if (p1, p2) in arbitrary else ""
+            print "game", p1, p2, "# A" if (p1, p2) in arbitrary else ""
         else:
             print "game", p1, p2
 

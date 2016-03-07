@@ -1,5 +1,6 @@
 #!/usr/bin/python
 
+import math
 import os.path
 import sys
 from argparse import ArgumentParser
@@ -15,6 +16,61 @@ from pair import (
         )
 
 class FTE_Scale(object):
+    """
+    If an odd number of players remain, one bye will be given, otherwise none.
+    Give the bye only to a player among the players with the fewest byes so far.
+    In descending order of N, minimize the number of pairings occurring for the Nth time.
+    Minimize the number of losses the bye recipient has, if any.
+    In descending order of N, minimize the number of pairings between players whose number of losses differ by N.
+    Give the bye to the player with the best possible STPR.
+    Maximize the sum of the squares of the STPR differences between paired players.
+    """
+    def __init__(self, lives, tourn):
+        self.lives = lives
+        self.tourn = tourn
+        self.num_alive = len(tourn.players)
+        rating_list = tourn.stpr.values()
+        self.max_rating = max(rating_list)
+        self.min_rating = min(rating_list)
+        self.rating_range = int(math.ceil(self.max_rating - self.min_rating))
+        if len(tourn.games):
+            most_repeated_pairing = tourn.pair_counts.most_common(1)[0][1]
+            self.pair_mul = (self.num_alive + 1) ** most_repeated_pairing
+            self.most_games = tourn.played.most_common(1)[0][1]
+        else:
+            self.pair_mul = 1
+            self.most_games = 0
+
+    def bye(self, player):
+        lives = self.lives
+        num_alive = self.num_alive
+
+        weight = self.most_games - self.tourn.played[player]
+        weight *= self.pair_mul * lives
+        weight += self.tourn.losses[player]
+        weight *= lives * (self.rating_range + 1) * ((num_alive + 1) ** lives)
+        # need integer weights
+        # FIXME: this can cause bad pairings if small stpr differences exist
+        weight += int(self.max_rating - self.tourn.stpr[player])
+        weight *= self.rating_range ** 2
+        return weight
+
+    def pair(self, p1, p2):
+        lives = self.lives
+        num_alive = self.num_alive
+
+        weight = (num_alive + 1) ** self.tourn.pair_counts[frozenset((p1, p2))]
+        weight *= lives ** 2 * ((num_alive + 1) ** lives)
+        weight += (num_alive + 1) ** abs(
+                self.tourn.losses[p1] - self.tourn.losses[p2])
+        weight *= (self.rating_range + 1) * (self.rating_range ** 2)
+        # need integer weights
+        # FIXME: this can cause bad pairings if small stpr differences exist
+        weight += self.rating_range ** 2 - int(
+                (self.tourn.stpr[p1] - self.tourn.stpr[p2]) ** 2)
+        return weight
+
+class FTE_2015_Scale(object):
     """
     If an odd number of players remain, one bye will be given, otherwise none.
     Give the bye only to a player among the players with the fewest byes so far.
@@ -84,9 +140,13 @@ def filter_games(tourn, lives):
             losses[p2] += 1
     return from_eventlist(events)
 
-def get_pairings(tourn, lives, virtual=0.5, use_utpr=False):
+def get_pairings(tourn, config):
+    lives = config.lives
+    virtual = config.virtual if hasattr(config, "virtual") else 0.5
+    use_utpr = config.utpr if hasattr(config, "utpr") else False
+    use_2015 = config.wc2015 if hasattr(config, "wc2015") else False
+
     stpr = rate(tourn.seeds, tourn, virtual)
-    tourn.players = set([p for p in tourn.players if tourn.losses[p] < lives])
     if use_utpr:
         utpr = rate({p: 1500 for p in tourn.seeds}, tourn, virtual)
         def order(p):
@@ -97,9 +157,33 @@ def get_pairings(tourn, lives, virtual=0.5, use_utpr=False):
     tourn.player_order = {p: order(p) for p in tourn.players}
     sorted_players = sorted(tourn.players, key=order)
     tourn.ranks = {p: rank for rank, p in enumerate(sorted_players, start=1)}
-    scale = FTE_Scale(lives, tourn)
+    tourn.stpr = stpr
+    tourn.players = set([p for p in tourn.players if tourn.losses[p] < lives])
+    if use_2015:
+        scale = FTE_2015_Scale(lives, tourn)
+    else:
+        scale = FTE_Scale(lives, tourn)
     pairings, bye = weighted_pairing(tourn, scale)
     return pairings, bye
+
+def print_final_ranking(tourn, virtual, use_utpr=False):
+    stpr = rate(tourn.seeds, tourn, virtual)
+    if use_utpr:
+        utpr = rate({p: 1500 for p in tourn.seeds}, tourn, virtual)
+        def order(p):
+            return (-(tourn.wins[p] + tourn.byes[p]),
+                -utpr[p], -stpr[p])
+    else:
+        def order(p):
+            return (-(tourn.wins[p] + tourn.byes[p]), -stpr[p])
+    players = sorted(tourn.seeds, key=order)
+    print "# Final ranks"
+    for rank, p in enumerate(players, start=1):
+        pord = order(p)
+        print "#", rank, p, -pord[0],
+        for rating in pord[1:]:
+            print -rating,
+        print
 
 def parse_args(args=None):
     parser = ArgumentParser(description="Pair FTE tournament")
@@ -108,6 +192,8 @@ def parse_args(args=None):
     parser.add_argument("-l", "--lives", help="Number of lives",
             type=int, default=3)
     parser.add_argument("--utpr", help="Use UTPR as in WC2013 pairing rules",
+            action="store_true")
+    parser.add_argument("--wc2015", help="Use wc2015 pairing weights",
             action="store_true")
     parser.add_argument("--all-games",
             help="Use all games, including those by eliminated players",
@@ -149,9 +235,12 @@ def main(args=None):
 
     if not args.all_games:
         tourn = filter_games(tourn, args.lives)
-    pairings, bye = get_pairings(tourn, args.lives, args.virtual, args.utpr)
+    pairings, bye = get_pairings(tourn, args)
+    if len(pairings) == 0: # tournament is finished, print final ranks
+        print_final_ranking(tourn, args.virtual, args.utpr)
+
     if args.ranks:
-        players = sorted(tourn.players, key=lambda p: tourn.ranks[p])
+        players = sorted(tourn.ranks, key=lambda p: tourn.ranks[p])
         for p in players:
             print "#", tourn.ranks[p], p, tourn.player_order[p][0],
             for r in tourn.player_order[p][1:]:
